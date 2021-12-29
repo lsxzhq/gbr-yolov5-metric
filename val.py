@@ -167,9 +167,9 @@ def run(data,
     jdict, stats, ap, ap_class = [], [], [], []
     pbar = tqdm(dataloader, desc=s, bar_format='{l_bar}{bar:10}{r_bar}{bar:-10b}')  # progress bar
 
-    tp_per_level = [0 for _ in range(11)]
-    fp_per_level = [0 for _ in range(11)]
-    fn_per_level = [0 for _ in range(11)]
+    tp_per_level = [0 for _ in iouv]
+    fp_per_level = [0 for _ in iouv]
+    fn_per_level = [0 for _ in iouv]
 
     for batch_i, (im, targets, paths, shapes) in enumerate(pbar):
         t1 = time_sync()
@@ -231,15 +231,6 @@ def run(data,
                     tp_per_level[iou_lvl] += num_correct_bbox
                     fp_per_level[iou_lvl] += num_predicted_bbox - num_correct_bbox
                     fn_per_level[iou_lvl] += nl - num_correct_bbox
-                    # print('path', path)
-                    # print('iou_th', iou_th.item())
-                    # print('num_true_labels', nl)
-                    # print('num_correct_bbox', num_correct_bbox.item())
-                    # print('num_predicted_bbox', num_predicted_bbox)
-                    # print(f'tp_per_level[{iou_lvl}]', tp_per_level[iou_lvl].item())
-                    # print(f'fp_per_level[{iou_lvl}]', fp_per_level[iou_lvl].item())
-                    # print(f'fn_per_level[{iou_lvl}]', fn_per_level[iou_lvl].item())
-                    # print('-------')
                 if plots:
                     confusion_matrix.process_batch(predn, labelsn)
             else:
@@ -262,20 +253,16 @@ def run(data,
 
     # Compute metrics
 
-    # if verbose:
-    #     print('*' * 15)
-    #     print('tp_per_level', tp_per_level)
-    #     print('fp_per_level', fp_per_level)
-    #     print('fn_per_level', fn_per_level)
-
     eps = 0.00000001
-    f2_per_level = [0 for _ in range(11)]
+    f2_per_level = []
     for iou_lvl, _ in enumerate(iouv):
-        f2_per_level[iou_lvl] = 5 * tp_per_level[iou_lvl] / (
-                5 * tp_per_level[iou_lvl] +
-                4 * fn_per_level[iou_lvl] +
-                1 * fp_per_level[iou_lvl] +
-                eps
+        f2_per_level.append(
+            5 * tp_per_level[iou_lvl] / (
+                    5 * tp_per_level[iou_lvl] +
+                    4 * fn_per_level[iou_lvl] +
+                    1 * fp_per_level[iou_lvl] +
+                    eps
+            )
         )
     f2_mean = np.mean(f2_per_level)
     if verbose:
