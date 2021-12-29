@@ -14,8 +14,8 @@ import torch
 
 def fitness(x):
     # Model fitness as a weighted combination of metrics
-    w = [0.0, 0.0, 0.1, 0.9]  # weights for [P, R, mAP@0.5, mAP@0.5:0.95]
-    return (x[:, :4] * w).sum(1)
+    w = [0.0, 0.0, 0.1, 0.2, 0.7]  # weights for [P, R, mAP@0.5, mAP@0.5:0.95]
+    return (x[:, :5] * w).sum(1)
 
 
 def ap_per_class(tp, conf, pred_cls, target_cls, plot=False, save_dir='.', names=(), eps=1e-16):
@@ -70,20 +70,20 @@ def ap_per_class(tp, conf, pred_cls, target_cls, plot=False, save_dir='.', names
                     py.append(np.interp(px, mrec, mpre))  # precision at mAP@0.5
 
     # Compute F1 (harmonic mean of precision and recall)
-    f1 = 2 * p * r / (p + r + eps)
+    f2 = 5 * p * r / (4 * p + r + eps)
     names = [v for k, v in names.items() if k in unique_classes]  # list: only classes that have data
     names = {i: v for i, v in enumerate(names)}  # to dict
     if plot:
         plot_pr_curve(px, py, ap, Path(save_dir) / 'PR_curve.png', names)
-        plot_mc_curve(px, f1, Path(save_dir) / 'F1_curve.png', names, ylabel='F1')
+        plot_mc_curve(px, f2, Path(save_dir) / 'F2_curve.png', names, ylabel='F1')
         plot_mc_curve(px, p, Path(save_dir) / 'P_curve.png', names, ylabel='Precision')
         plot_mc_curve(px, r, Path(save_dir) / 'R_curve.png', names, ylabel='Recall')
 
-    i = f1.mean(0).argmax()  # max F1 index
-    p, r, f1 = p[:, i], r[:, i], f1[:, i]
+    i = f2.mean(0).argmax()  # max F2 index
+    p, r, f1 = p[:, i], r[:, i], f2[:, i]
     tp = (r * nt).round()  # true positives
     fp = (tp / (p + eps) - tp).round()  # false positives
-    return tp, fp, p, r, f1, ap, unique_classes.astype('int32')
+    return tp, fp, p, r, f2, ap, unique_classes.astype('int32')
 
 
 def compute_ap(recall, precision):
@@ -299,6 +299,104 @@ def wh_iou(wh1, wh2):
     inter = torch.min(wh1, wh2).prod(2)  # [N,M]
     return inter / (wh1.prod(2) + wh2.prod(2) - inter)  # iou = inter / (area1 + area2 - inter)
 
+
+# competition metric ---------------------------------------------------------------------------------------------------
+
+def calc_iou(bboxes1, bboxes2, bbox_mode='xywh'):
+    assert len(bboxes1.shape) == 2 and bboxes1.shape[1] == 4
+    assert len(bboxes2.shape) == 2 and bboxes2.shape[1] == 4
+
+    bboxes1 = bboxes1.copy()
+    bboxes2 = bboxes2.copy()
+
+    if bbox_mode == 'xywh':
+        bboxes1[:, 2:] += bboxes1[:, :2]
+        bboxes2[:, 2:] += bboxes2[:, :2]
+
+    x11, y11, x12, y12 = np.split(bboxes1, 4, axis=1)
+    x21, y21, x22, y22 = np.split(bboxes2, 4, axis=1)
+    xA = np.maximum(x11, np.transpose(x21))
+    yA = np.maximum(y11, np.transpose(y21))
+    xB = np.minimum(x12, np.transpose(x22))
+    yB = np.minimum(y12, np.transpose(y22))
+    interArea = np.maximum((xB - xA + 1), 0) * np.maximum((yB - yA + 1), 0)
+    boxAArea = (x12 - x11 + 1) * (y12 - y11 + 1)
+    boxBArea = (x22 - x21 + 1) * (y22 - y21 + 1)
+    iou = interArea / (boxAArea + np.transpose(boxBArea) - interArea)
+    return iou
+
+
+def f_beta(tp, fp, fn, beta=2):
+    return (1 + beta ** 2) * tp / ((1 + beta ** 2) * tp + beta ** 2 * fn + fp)
+
+
+def calc_is_correct_at_iou_th(gt_bboxes, pred_bboxes, iou_th, verbose=False):
+    gt_bboxes = gt_bboxes.copy()
+    pred_bboxes = pred_bboxes.copy()
+
+    tp = 0
+    fp = 0
+    for k, pred_bbox in enumerate(pred_bboxes):  # fixed in ver.7
+        ious = calc_iou(gt_bboxes, pred_bbox[None, :-1])
+        max_iou = ious.max()
+        if max_iou > iou_th:
+            tp += 1
+            gt_bboxes = np.delete(gt_bboxes, ious.argmax(), axis=0)
+        else:
+            fp += 1
+        if len(gt_bboxes) == 0:
+            fp += len(pred_bboxes) - (k + 1)  # fix in ver.7
+            break
+
+    fn = len(gt_bboxes)
+    return tp, fp, fn
+
+
+def calc_is_correct(gt_bboxes, pred_bboxes):
+    """
+    gt_bboxes: (N, 4) np.array in xywh format
+    pred_bboxes: (N, 5) np.array in conf+xywh format
+    """
+    if len(gt_bboxes) == 0 and len(pred_bboxes) == 0:
+        tps, fps, fns = 0, 0, 0
+        return tps, fps, fns
+
+    elif len(gt_bboxes) == 0:
+        tps, fps, fns = 0, len(pred_bboxes), 0
+        return tps, fps, fns
+
+    elif len(pred_bboxes) == 0:
+        tps, fps, fns = 0, 0, len(gt_bboxes)
+        return tps, fps, fns
+
+    pred_bboxes = pred_bboxes[pred_bboxes[:, -1].argsort()[::-1]]  # sort by conf
+
+    tps, fps, fns = 0, 0, 0
+    for iou_th in np.arange(0.3, 0.85, 0.05):
+        tp, fp, fn = calc_is_correct_at_iou_th(gt_bboxes, pred_bboxes, iou_th)
+        tps += tp
+        fps += fp
+        fns += fn
+    return tps, fps, fns
+
+
+def calc_f2_score(gt_bboxes_list, pred_bboxes_list, verbose=False):
+    """
+    gt_bboxes_list: list of (N, 4) np.array in xywh format
+    pred_bboxes_list: list of (N, 5) np.array in conf+xywh format
+    """
+    tps, fps, fns = 0, 0, 0
+    for gt_bboxes, pred_bboxes in zip(gt_bboxes_list, pred_bboxes_list):
+        print(gt_bboxes, pred_bboxes)
+        tp, fp, fn = calc_is_correct(gt_bboxes, pred_bboxes)
+        tps += tp
+        fps += fp
+        fns += fn
+        if verbose:
+            num_gt = len(gt_bboxes)
+            num_pred = len(pred_bboxes)
+            print(f'num_gt:{num_gt:<3} num_pred:{num_pred:<3} tp:{tp:<3} fp:{fp:<3} fn:{fn:<3}')
+    return f_beta(tps, fps, fns, beta=2)
 
 # Plots ----------------------------------------------------------------------------------------------------------------
 
