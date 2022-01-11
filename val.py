@@ -284,6 +284,7 @@ def run(data,
 
     # Print results per class
     if (verbose or (nc < 50 and not training)) and nc > 1 and len(stats):
+        pf = '%20s' + '%11i' * 2 + '%11.3g' * 4
         for i, c in enumerate(ap_class):
             LOGGER.info(pf % (names[c], seen, nt[c], p[i], r[i], ap30[i], ap[i]))
 
