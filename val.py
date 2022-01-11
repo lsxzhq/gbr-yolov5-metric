@@ -264,7 +264,7 @@ def run(data,
                     eps
             )
         )
-    f2_mean = np.mean(f2_per_level)
+    f2_mean = torch.mean(torch.FloatTensor(f2_per_level).to(device))
     if verbose:
         print('f2_per_level', f2_per_level)
         print('f2_mean', f2_mean)
