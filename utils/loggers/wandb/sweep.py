@@ -24,7 +24,7 @@ def sweep():
     opt.batch_size = hyp_dict.get("batch_size")
     opt.save_dir = str(increment_path(Path(opt.project) / opt.name, exist_ok=opt.exist_ok or opt.evolve))
     opt.epochs = hyp_dict.get("epochs")
-    opt.nosave = True
+    opt.nosave = hyp_dict.get("nosave", False)
     opt.data = hyp_dict.get("data")
     opt.weights = str(opt.weights)
     opt.cfg = str(opt.cfg)
