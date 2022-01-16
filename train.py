@@ -264,7 +264,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
     # nw = min(nw, (epochs - start_epoch) / 2 * nb)  # limit warmup to < 1/2 of training
     last_opt_step = -1
     maps = np.zeros(nc)  # mAP per class
-    results = (0, 0, 0, 0, 0, 0, 0)  # P, R, mAP@.5, mAP@.5-.95, val_loss(box, obj, cls)
+    results = (0, 0, 0, 0, 0, 0, 0)  # P, R, mAP@.3, mAP@.3-.8, val_loss(box, obj, cls)
     scheduler.last_epoch = start_epoch - 1  # do not move
     scaler = amp.GradScaler(enabled=cuda)
     stopper = EarlyStopping(patience=opt.patience)
@@ -390,11 +390,8 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                 torch.save(ckpt, last)
                 if best_fitness == fi:
                     torch.save(ckpt, best)
-                if epoch > 0:
-                    if (opt.save_period > 0) and (epoch % opt.save_period == 0):
-                        torch.save(ckpt, w / f'epoch{epoch}.pt')
-                    elif epoch in opt.save_in_epochs.split():
-                        torch.save(ckpt, w / f'epoch{epoch}.pt')
+                if (opt.save_period > 0) and (epoch > 0 and not final_epoch) and (((epoch + 1) % opt.save_period) == 0):
+                    torch.save(ckpt, w / f'epoch{epoch}.pt')
                 del ckpt
                 callbacks.run('on_model_save', last, epoch, final_epoch, best_fitness, fi)
 
