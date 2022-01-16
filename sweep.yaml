@@ -1,0 +1,193 @@
+entity: ji411  # TODO
+project: yolov5-sweeps-3200
+method: random
+parameters:
+  anchor_t:
+    distribution: categorical
+    values:
+    - 4
+  batch_size:
+    distribution: categorical
+    values:
+    - 1
+  box:
+    distribution: categorical
+    values:
+    - 0.05
+    - 0.03
+    - 0.07
+  cls:
+    distribution: categorical
+    values:
+    - 0.5
+  cls_pw:
+    distribution: categorical
+    values:
+    - 1
+  copy_paste:
+    distribution: categorical
+    values:
+    - 0
+  data:     # TODO
+    distribution: categorical
+    values:
+    - yolov5_dataset/fold_0.yaml
+  degrees:
+    distribution: int_uniform
+    max: 30
+    min: 0
+#  device:   # TODO
+#    distribution: categorical
+#    values:
+#    - 0,1
+  epochs:
+    distribution: categorical
+    values:
+    - 25
+  fl_gamma:
+    distribution: categorical
+    values:
+    - 0
+    - 0.5
+    - 1
+    - 1.5
+  fliplr:
+    distribution: categorical
+    values:
+    - 0.6
+    - 0.5
+    - 0.4
+  flipud:
+    distribution: categorical
+    values:
+    - 0
+    - 0.2
+    - 0.5
+  hsv_h:
+    distribution: categorical
+    values:
+    - 0.015
+    - 0.01
+    - 0.02
+  hsv_s:
+    distribution: categorical
+    values:
+    - 0.7
+    - 0.5
+    - 0.8
+  hsv_v:
+    distribution: categorical
+    values:
+    - 0.4
+    - 0.2
+    - 0.5
+  img:  # TODO
+    distribution: categorical
+    values:
+    - 3200
+  iou_t:
+    distribution: categorical
+    values:
+    - 0.2
+    - 0.25
+    - 0.15
+    - 0.3
+    - 0.4
+  lr0:
+    distribution: categorical
+    values:
+    - 0.01
+    - 0.005
+    - 0.002
+    - 0.001
+    - 0.0008
+    - 0.0005
+  lrf:
+    distribution: categorical
+    values:
+    - 0.05
+    - 0.1
+    - 0.2
+  mixup:
+    distribution: categorical
+    values:
+    - 0
+    - 0.2
+    - 0.5
+  momentum:
+    distribution: categorical
+    values:
+    - 0.937
+    - 0.99
+  mosaic:
+    distribution: categorical
+    values:
+    - 1
+    - 0.8
+    - 0.5
+  obj:
+    distribution: categorical
+    values:
+    - 1
+    - 1.2
+    - 0.8
+  obj_pw:
+    distribution: categorical
+    values:
+    - 1
+    - 1.2
+    - 0.8
+  optimizer:
+    distribution: categorical
+    values:
+    - Adam
+    - SGD
+    - AdamW
+  perspective:
+    distribution: categorical
+    values:
+    - 0
+    - 0.001
+    - 0.0001
+  scale:
+    distribution: uniform
+    max: 0.7
+    min: 0.3
+  shear:
+    distribution: categorical
+    values:
+    - 0
+    - 0.1
+  translate:
+    distribution: uniform
+    max: 0.5
+    min: 0.0
+  warmup_bias_lr:
+    distribution: categorical
+    values:
+    - 0.1
+    - 0.2
+    - 0.4
+  warmup_epochs:
+    distribution: categorical
+    values:
+    - 3
+    - 4
+    - 2
+  warmup_momentum:
+    distribution: categorical
+    values:
+    - 0.8
+    - 0.9
+    - 1
+  weight_decay:
+    distribution: categorical
+    values:
+    - 0.0005
+    - 0.0006
+    - 0.0004
+  weights:
+    distribution: categorical
+    values:
+    - yolov5s6.pt
+program: ./utils/loggers/wandb/sweep.py
