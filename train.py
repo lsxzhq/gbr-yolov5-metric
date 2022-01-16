@@ -163,14 +163,14 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
             g1.append(v.weight)
 
     hyp['optimizer'] = hyp.get('optimizer', None)
-    if hyp['optimizer'] == 'adam':
+    if hyp['optimizer'] == 'Adam':
         optimizer = Adam(g0, lr=hyp['lr0'], betas=(hyp['momentum'], 0.999))  # adjust beta1 to momentum
-    elif hyp['optimizer'] == 'sgd':
-        optimizer = SGD(g0, lr=hyp['lr0'], momentum=hyp['momentum'], nesterov=True)
-    elif hyp['optimizer'] == 'adamw':
+    elif hyp['optimizer'] == 'AdamW':
         optimizer = AdamW(g0, lr=hyp['lr0'], betas=(hyp['momentum'], 0.999))  # adjust beta1 to momentum
+    elif hyp['optimizer'] == 'SGD':
+        optimizer = SGD(g0, lr=hyp['lr0'], momentum=hyp['momentum'], nesterov=True)
     else:
-        raise ValueError('Optimizer must be one of: adam, sgd')
+        raise ValueError('Optimizer must be one of: Adam, AdamW, SGD')
 
     optimizer.add_param_group({'params': g1, 'weight_decay': hyp['weight_decay']})  # add g1 with weight_decay
     optimizer.add_param_group({'params': g2})  # add g2 (biases)
