@@ -6,10 +6,10 @@ parameters:
     distribution: categorical
     values:
     - 4
-  batch_size:
+  batch_size:  # TODO
     distribution: categorical
     values:
-    - 1
+    - 64
   box:
     distribution: categorical
     values:
@@ -31,19 +31,19 @@ parameters:
   data:     # TODO
     distribution: categorical
     values:
-    - yolov5_dataset/fold_0.yaml
+    - data/coco128.yaml
   degrees:
     distribution: int_uniform
     max: 30
     min: 0
-#  device:   # TODO
-#    distribution: categorical
-#    values:
-#    - 0,1
-  epochs:
+ device:   # TODO
+   distribution: categorical
+   values:
+   - 0
+  epochs:  # TODO
     distribution: categorical
     values:
-    - 25
+    - 2
   fl_gamma:
     distribution: categorical
     values:
@@ -84,7 +84,7 @@ parameters:
   img:  # TODO
     distribution: categorical
     values:
-    - 3200
+    - 64
   iou_t:
     distribution: categorical
     values:
@@ -189,5 +189,5 @@ parameters:
   weights:
     distribution: categorical
     values:
-    - yolov5s6.pt
+    - yolov5n6.pt
 program: ./utils/loggers/wandb/sweep.py
