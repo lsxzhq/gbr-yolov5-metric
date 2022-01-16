@@ -227,7 +227,7 @@ def run(data,
             else:
                 correct = torch.zeros(pred.shape[0], niou, dtype=torch.bool)
 
-            num_predicted_bbox = pred.shape[0]
+            num_predicted_bbox = pred.shape[0].cpu()
             for iou_lvl, iou_th in enumerate(iouv):
                 correct_iou_lvl = correct[:, iou_lvl]
                 num_correct_bbox = correct_iou_lvl.sum()
