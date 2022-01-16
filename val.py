@@ -239,15 +239,16 @@ def run(data,
             else:
                 correct = torch.zeros(pred.shape[0], niou, dtype=torch.bool)
 
-            num_predicted_bbox = pred.shape[0].cpu()
+            correct = correct.cpu()
+            num_predicted_bbox = correct.shape[0]
             for iou_lvl, iou_th in enumerate(iouv):
                 correct_iou_lvl = correct[:, iou_lvl]
                 num_correct_bbox = correct_iou_lvl.sum()
                 tp_per_level[iou_lvl] += num_correct_bbox
                 fp_per_level[iou_lvl] += num_predicted_bbox - num_correct_bbox
                 fn_per_level[iou_lvl] += nl - num_correct_bbox
-                
-            stats.append((correct.cpu(), pred[:, 4].cpu(), pred[:, 5].cpu(), tcls))  # (correct, conf, pcls, tcls)
+
+            stats.append((correct, pred[:, 4].cpu(), pred[:, 5].cpu(), tcls))  # (correct, conf, pcls, tcls)
 
             # Save/log
             if save_txt:
