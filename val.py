@@ -222,19 +222,19 @@ def run(data,
                 scale_coords(im[si].shape[1:], tbox, shape, shapes[si][1])  # native-space labels
                 labelsn = torch.cat((labels[:, 0:1], tbox), 1)  # native-space labels
                 correct = process_batch(predn, labelsn, iouv)
-                # print(correct.shape)
-                # print(correct)
-                num_predicted_bbox = correct.shape[0]
-                for iou_lvl, iou_th in enumerate(iouv):
-                    correct_iou_lvl = correct[:, iou_lvl]
-                    num_correct_bbox = correct_iou_lvl.sum()
-                    tp_per_level[iou_lvl] += num_correct_bbox
-                    fp_per_level[iou_lvl] += num_predicted_bbox - num_correct_bbox
-                    fn_per_level[iou_lvl] += nl - num_correct_bbox
                 if plots:
                     confusion_matrix.process_batch(predn, labelsn)
             else:
                 correct = torch.zeros(pred.shape[0], niou, dtype=torch.bool)
+
+            num_predicted_bbox = correct.shape[0]
+            for iou_lvl, iou_th in enumerate(iouv):
+                correct_iou_lvl = correct[:, iou_lvl]
+                num_correct_bbox = correct_iou_lvl.sum()
+                tp_per_level[iou_lvl] += num_correct_bbox
+                fp_per_level[iou_lvl] += num_predicted_bbox - num_correct_bbox
+                fn_per_level[iou_lvl] += nl - num_correct_bbox
+                
             stats.append((correct.cpu(), pred[:, 4].cpu(), pred[:, 5].cpu(), tcls))  # (correct, conf, pcls, tcls)
 
             # Save/log
