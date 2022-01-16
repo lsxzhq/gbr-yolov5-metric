@@ -36,7 +36,7 @@ parameters:
     distribution: int_uniform
     max: 30
     min: 0
- device:   # TODO
+  device:   # TODO
    distribution: categorical
    values:
    - 0
