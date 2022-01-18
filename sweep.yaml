@@ -2,6 +2,11 @@ entity: ji411  # TODO
 project: yolov5-sweeps-3200
 method: random
 parameters:
+  albumentations:
+    distribution: categorical
+    values:
+      - true
+      - false
   anchor_t:
     distribution: categorical
     values:

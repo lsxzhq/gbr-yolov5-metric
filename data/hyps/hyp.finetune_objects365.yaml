@@ -30,3 +30,4 @@ mosaic: 1.0
 mixup: 0.0
 copy_paste: 0.0
 optimizer: SGD
+albumentations: True
