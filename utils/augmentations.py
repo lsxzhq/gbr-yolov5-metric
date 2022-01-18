@@ -34,6 +34,7 @@ class Albumentations:
             LOGGER.info(colorstr('albumentations: ') + ', '.join(f'{x}' for x in self.transform.transforms if x.p))
         except ImportError:  # package not installed, skip
             pass
+            LOGGER.info(colorstr('albumentations: ') + 'not installed, skip')
         except Exception as e:
             LOGGER.info(colorstr('albumentations: ') + f'{e}')
 
