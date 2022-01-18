@@ -391,7 +391,7 @@ class LoadImagesAndLabels(Dataset):
         self.stride = stride
         self.path = path
         self.albumentations = Albumentations() if augment and hyp.get('albumentations', True) else None
-        LOGGER.info(('use' if self.albumentations is not None else "don't use") + ' albumentations')
+        # LOGGER.info(('use' if self.albumentations is not None else "don't use") + ' albumentations')
 
         try:
             f = []  # image files
