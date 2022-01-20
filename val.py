@@ -1,9 +1,19 @@
 # YOLOv5 🚀 by Ultralytics, GPL-3.0 license
 """
 Validate a trained YOLOv5 model accuracy on a custom dataset
-
 Usage:
-    $ python path/to/val.py --data coco128.yaml --weights yolov5s.pt --img 640
+    $ python path/to/val.py --weights yolov5s.pt --data coco128.yaml --img 640
+Usage - formats:
+    $ python path/to/val.py --weights yolov5s.pt                 # PyTorch
+                                      yolov5s.torchscript        # TorchScript
+                                      yolov5s.onnx               # ONNX Runtime or OpenCV DNN with --dnn
+                                      yolov5s.xml                # OpenVINO
+                                      yolov5s.engine             # TensorRT
+                                      yolov5s.mlmodel            # CoreML (MacOS-only)
+                                      yolov5s_saved_model        # TensorFlow SavedModel
+                                      yolov5s.pb                 # TensorFlow GraphDef
+                                      yolov5s.tflite             # TensorFlow Lite
+                                      yolov5s_edgetpu.tflite     # TensorFlow Edge TPU
 """
 
 import argparse
@@ -124,10 +134,10 @@ def run(data,
         (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
 
         # Load model
-        model = DetectMultiBackend(weights, device=device, dnn=dnn)
-        stride, pt, jit, engine = model.stride, model.pt, model.jit, model.engine
+        model = DetectMultiBackend(weights, device=device, dnn=dnn, data=data)
+        stride, pt, jit, onnx, engine = model.stride, model.pt, model.jit, model.onnx, model.engine
         imgsz = check_img_size(imgsz, s=stride)  # check image size
-        half &= (pt or jit or engine) and device.type != 'cpu'  # half precision only supported by PyTorch on CUDA
+        half &= (pt or jit or onnx or engine) and device.type != 'cpu'  # FP16 supported on limited backends with CUDA
         if pt or jit:
             model.model.half() if half else model.model.float()
         elif engine:
@@ -145,7 +155,7 @@ def run(data,
     model.eval()
     is_coco = isinstance(data.get('val'), str) and data['val'].endswith('coco/val2017.txt')  # COCO dataset
     nc = 1 if single_cls else int(data['nc'])  # number of classes
-    iouv = torch.linspace(0.3, 0.8, 11).to(device)  # iou vector for mAP@0.3:0.8
+    iouv = torch.linspace(0.5, 0.95, 10).to(device)  # iou vector for mAP@0.5:0.95
     niou = iouv.numel()
 
     # Dataloader
@@ -160,17 +170,11 @@ def run(data,
     confusion_matrix = ConfusionMatrix(nc=nc)
     names = {k: v for k, v in enumerate(model.names if hasattr(model, 'names') else model.module.names)}
     class_map = coco80_to_coco91_class() if is_coco else list(range(1000))
-    s = ('%20s' + '%11s' * 7) % ('Class', 'Images', 'Labels', 'P', 'R', 'mAP@.3', 'mAP@.3:.8', 'F2')
-    dt, p, r, f1, mp, mr, map30, map, f2_mean = [0.0, 0.0, 0.0], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+    s = ('%20s' + '%11s' * 6) % ('Class', 'Images', 'Labels', 'P', 'R', 'mAP@.5', 'mAP@.5:.95')
+    dt, p, r, f1, mp, mr, map50, map = [0.0, 0.0, 0.0], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
     loss = torch.zeros(3, device=device)
-    ap30 = []
     jdict, stats, ap, ap_class = [], [], [], []
     pbar = tqdm(dataloader, desc=s, bar_format='{l_bar}{bar:10}{r_bar}{bar:-10b}')  # progress bar
-
-    tp_per_level = [0 for _ in iouv]
-    fp_per_level = [0 for _ in iouv]
-    fn_per_level = [0 for _ in iouv]
-
     for batch_i, (im, targets, paths, shapes) in enumerate(pbar):
         t1 = time_sync()
         if pt or jit or engine:
@@ -226,15 +230,6 @@ def run(data,
                     confusion_matrix.process_batch(predn, labelsn)
             else:
                 correct = torch.zeros(pred.shape[0], niou, dtype=torch.bool)
-
-            num_predicted_bbox = correct.shape[0]
-            for iou_lvl, iou_th in enumerate(iouv):
-                correct_iou_lvl = correct[:, iou_lvl]
-                num_correct_bbox = correct_iou_lvl.sum()
-                tp_per_level[iou_lvl] += num_correct_bbox
-                fp_per_level[iou_lvl] += num_predicted_bbox - num_correct_bbox
-                fn_per_level[iou_lvl] += nl - num_correct_bbox
-                
             stats.append((correct.cpu(), pred[:, 4].cpu(), pred[:, 5].cpu(), tcls))  # (correct, conf, pcls, tcls)
 
             # Save/log
@@ -252,41 +247,23 @@ def run(data,
             Thread(target=plot_images, args=(im, output_to_target(out), paths, f, names), daemon=True).start()
 
     # Compute metrics
-
-    eps = 0.00000001
-    f2_per_level = []
-    for iou_lvl, _ in enumerate(iouv):
-        f2_per_level.append(
-            5 * tp_per_level[iou_lvl] / (
-                    5 * tp_per_level[iou_lvl] +
-                    4 * fn_per_level[iou_lvl] +
-                    1 * fp_per_level[iou_lvl] +
-                    eps
-            )
-        )
-    f2_mean = torch.mean(torch.FloatTensor(f2_per_level)).cpu()
-    if verbose:
-        print('f2_per_level', f2_per_level)
-        print('f2_mean', f2_mean)
-
     stats = [np.concatenate(x, 0) for x in zip(*stats)]  # to numpy
     if len(stats) and stats[0].any():
         tp, fp, p, r, f1, ap, ap_class = ap_per_class(*stats, plot=plots, save_dir=save_dir, names=names)
-        ap30, ap = ap[:, 0], ap.mean(1)  # AP@0.3, AP@0.3:0.8
-        mp, mr, map30, map = p.mean(), r.mean(), ap30.mean(), ap.mean()
+        ap50, ap = ap[:, 0], ap.mean(1)  # AP@0.5, AP@0.5:0.95
+        mp, mr, map50, map = p.mean(), r.mean(), ap50.mean(), ap.mean()
         nt = np.bincount(stats[3].astype(np.int64), minlength=nc)  # number of targets per class
     else:
         nt = torch.zeros(1)
 
     # Print results
-    pf = '%20s' + '%11i' * 2 + '%11.3g' * 5  # print format
-    LOGGER.info(pf % ('all', seen, nt.sum(), mp, mr, map30, map, f2_mean))
+    pf = '%20s' + '%11i' * 2 + '%11.3g' * 4  # print format
+    LOGGER.info(pf % ('all', seen, nt.sum(), mp, mr, map50, map))
 
     # Print results per class
     if (verbose or (nc < 50 and not training)) and nc > 1 and len(stats):
-        pf = '%20s' + '%11i' * 2 + '%11.3g' * 4
         for i, c in enumerate(ap_class):
-            LOGGER.info(pf % (names[c], seen, nt[c], p[i], r[i], ap30[i], ap[i]))
+            LOGGER.info(pf % (names[c], seen, nt[c], p[i], r[i], ap50[i], ap[i]))
 
     # Print speeds
     t = tuple(x / seen * 1E3 for x in dt)  # speeds per image
@@ -321,7 +298,7 @@ def run(data,
             eval.evaluate()
             eval.accumulate()
             eval.summarize()
-            map, map30 = eval.stats[:2]  # update results (mAP@0.3:0.8, mAP@0.3)
+            map, map50 = eval.stats[:2]  # update results (mAP@0.5:0.95, mAP@0.5)
         except Exception as e:
             LOGGER.info(f'pycocotools unable to run: {e}')
 
@@ -333,7 +310,7 @@ def run(data,
     maps = np.zeros(nc) + map
     for i, c in enumerate(ap_class):
         maps[c] = ap[i]
-    return (mp, mr, map30, map, f2_mean, *(loss.cpu() / len(dataloader)).tolist()), maps, t
+    return (mp, mr, map50, map, *(loss.cpu() / len(dataloader)).tolist()), maps, t
 
 
 def parse_opt():
@@ -342,7 +319,7 @@ def parse_opt():
     parser.add_argument('--weights', nargs='+', type=str, default=ROOT / 'yolov5s.pt', help='model.pt path(s)')
     parser.add_argument('--batch-size', type=int, default=32, help='batch size')
     parser.add_argument('--imgsz', '--img', '--img-size', type=int, default=640, help='inference size (pixels)')
-    parser.add_argument('--conf-thres', type=float, default=0.1, help='confidence threshold')
+    parser.add_argument('--conf-thres', type=float, default=0.001, help='confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.6, help='NMS IoU threshold')
     parser.add_argument('--task', default='val', help='train, val, test, speed or study')
     parser.add_argument('--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
